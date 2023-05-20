@@ -50,7 +50,7 @@ app.get("/api/posts", async (req, res) => {
     const posts = await prisma.videos.findMany({orderBy: [{ title: 'desc'}]})
 
     for (const post of posts) {
-        post.videoUrl = `${cloudfrontUrl}/${"foldeer-upload-test"}/${post.fileName}`;
+        post.videoUrl = `${cloudfrontUrl}/${post.fileName}`;
     }
 
     res.send(posts)
@@ -65,7 +65,7 @@ app.post("/api/posts", upload.single('file'), async (req, res) => {
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
     const params = {
         Bucket: bucketName,
-        Key: `${req.body.eventName?.replaceAll(" ", "-").toLowerCase()}/${fileName}`,
+        Key: fileName,
         Body: req.file.buffer,
         ContentType: req.file.mimetype
     }
