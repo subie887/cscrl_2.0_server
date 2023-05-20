@@ -3,7 +3,6 @@ import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 
