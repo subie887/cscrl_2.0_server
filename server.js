@@ -46,17 +46,37 @@ const upload = multer({ storage: storage })
 var port = process.env.PORT || 3000;
 
 
-app.get("/api/posts", async (req, res) => {
-    const posts = await prisma.videos.findMany({orderBy: [{ title: 'desc'}]})
 
-    for (const post of posts) {
-        post.videoUrl = `${cloudfrontUrl}/${post.fileName}`;
+app.get("/api/videos/:confname", async (req, res) => {
+
+    console.log(req.params.confname)
+    const videos = await prisma.videos.findMany({
+        where: {
+            eventName: req.params.confname
+        }
+    })
+
+    for (const video of videos) {
+        video.url = `${cloudfrontUrl}/${video.eventName}/${video.fileName}`;
     }
 
-    res.send(posts)
+    console.log(videos)
+
+    res.send(videos)
 })
 
-app.post("/api/posts", upload.single('file'), async (req, res) => {
+app.get("/api/events", async (req, res) => {
+    const videos = await prisma.videos.groupBy({ by: ["eventName"] })
+    let uniqueEventNames = []
+
+    for (const video of videos) {
+        uniqueEventNames.push(video.eventName)
+    }
+
+    res.send(uniqueEventNames)
+})
+
+app.post("/api/videos", upload.single('file'), async (req, res) => {
     /* 
     console.log("req.body", req.body)
     console.log("req.file", req.file)
@@ -65,7 +85,7 @@ app.post("/api/posts", upload.single('file'), async (req, res) => {
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
     const params = {
         Bucket: bucketName,
-        Key: fileName,
+        Key: `${req.body.eventName}/${fileName}`,
         Body: req.file.buffer,
         ContentType: req.file.mimetype
     }
@@ -97,7 +117,7 @@ app.post("/api/posts", upload.single('file'), async (req, res) => {
 })
 
 
-app.delete("/api/posts/:id", async (req, res) => {
+app.delete("/api/videos/:id", async (req, res) => {
     const id = +req.params.id
     const post = prisma.videos.findUnique({where: {id}}) 
     if (!post) {
@@ -107,7 +127,7 @@ app.delete("/api/posts/:id", async (req, res) => {
 
     const params = {
         Bucket: bucketName,
-        Key: post.title
+        Key: `${req.body.eventName}/${post.title}`
     }
 
     const command = new DeleteObjectCommand(params)
