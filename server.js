@@ -27,17 +27,21 @@ const s3 = new S3Client({
 const app = express()
 app.use(
     cors({
-        origin: ["http://localhost:5176", "https://cscrl.onrender.com"],
+        origin: ["http://localhost:5173", "https://cscrl.onrender.com"],
+        
     })
 );
 
+app.options('*', cors());
+
+/*
 app.use(function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT,DELETE");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
     next();
 });
-
+*/
 const prisma = new PrismaClient()
 
 const storage = multer.memoryStorage()
@@ -48,8 +52,6 @@ var port = process.env.PORT || 3000;
 
 
 app.get("/api/videos/:confname", async (req, res) => {
-
-    console.log(req.params.confname)
     const videos = await prisma.videos.findMany({
         where: {
             eventName: req.params.confname
@@ -59,8 +61,6 @@ app.get("/api/videos/:confname", async (req, res) => {
     for (const video of videos) {
         video.url = `${cloudfrontUrl}/${video.eventName}/${video.fileName}`;
     }
-
-    console.log(videos)
 
     res.send(videos)
 })
@@ -77,10 +77,6 @@ app.get("/api/events", async (req, res) => {
 })
 
 app.post("/api/videos", upload.single('file'), async (req, res) => {
-    /* 
-    console.log("req.body", req.body)
-    console.log("req.file", req.file)
-    */
 
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
     const params = {
@@ -127,17 +123,17 @@ app.delete("/api/videos/:id", async (req, res) => {
 
     const params = {
         Bucket: bucketName,
-        Key: `${req.body.eventName}/${post.title}`
+        Key: `${post.title}`
     }
 
     const command = new DeleteObjectCommand(params)
     await s3.send(command)
 
-    await prisma.videos.delete({where: {id}})
+    await prisma.videos.delete({where: {id: req.params.id}})
 
     res.send(post)
 })
 
 app.listen(port, function () {
-  console.log('Example app listening on port ' + port + '!');
+  console.log('app listening on port ' + port + '!');
 });
