@@ -5,6 +5,7 @@ import cors from 'cors';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { ObjectId } from 'mongodb';
 
 dotenv.config()
 
@@ -42,6 +43,7 @@ app.use(function (req, res, next) {
     next();
 });
 */
+
 const prisma = new PrismaClient()
 
 const storage = multer.memoryStorage()
@@ -59,7 +61,7 @@ app.get("/api/videos/:confname", async (req, res) => {
     })
 
     for (const video of videos) {
-        video.url = `${cloudfrontUrl}/${video.eventName}/${video.fileName}`;
+        video.url = `${cloudfrontUrl}/${video.eventName}/${video.fileName}`
     }
 
     res.send(videos)
@@ -74,6 +76,21 @@ app.get("/api/events", async (req, res) => {
     }
 
     res.send(uniqueEventNames)
+})
+
+app.get("/api/associates", async (req, res) => {
+    const associates = await prisma.associates.findMany({
+        orderBy: [
+            { firstName: "desc" },
+            { lastName: 'desc' },
+        ]
+    })
+
+    for(const associate of associates) {
+        associate.img = `${cloudfrontUrl}/people-photos/${associate.img}`
+    }
+
+    res.send(associates)
 })
 
 app.post("/api/videos", upload.single('file'), async (req, res) => {
@@ -112,10 +129,50 @@ app.post("/api/videos", upload.single('file'), async (req, res) => {
     res.send({})
 })
 
+app.post("/api/associates", upload.single('img'), async (req, res) => {
+
+    console.log(`FILE: ${req.file}`)
+    const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
+    const params = {
+        Bucket: bucketName,
+        Key: `people-photos/${fileName}`,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+    }
+
+    const command = new PutObjectCommand(params)
+
+    await s3.send(command)
+
+    
+    const post = prisma.associates.create({
+        data: {
+            img: fileName,
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            role: req.body.role,
+            bio: req.body.bio,
+        }
+    })
+    .then((createdPerson) => {
+    console.log('Person created:', createdPerson);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+
+    res.send({})
+})
+
 
 app.delete("/api/videos/:id", async (req, res) => {
-    const id = +req.params.id
-    const post = prisma.videos.findUnique({where: {id}}) 
+    const id = req.params.id
+    console.log(`Deleting ${id}`)
+    const post = await prisma.videos.findUnique({where: {id}}) 
+    
     if (!post) {
         res.status(404).send("Not found")
         return
@@ -123,14 +180,44 @@ app.delete("/api/videos/:id", async (req, res) => {
 
     const params = {
         Bucket: bucketName,
-        Key: `${post.title}`
+        Key: `${post.eventName}/${post.fileName}`
     }
+
+    console.log(`Deleting ${params.Key}`)
 
     const command = new DeleteObjectCommand(params)
     await s3.send(command)
 
-    await prisma.videos.delete({where: {id: req.params.id}})
+    await prisma.videos.delete({
+        where: {id}
+    })
 
+    res.send(post)
+})
+
+app.delete("/api/associates/:id", async (req, res) => {
+    const id = req.params.id
+    console.log(`Deleting ${id}`)
+    
+    const post = await prisma.associates.findUnique({where: {id}}) 
+    if (!post) {
+        res.status(404).send("Not found")
+        return
+    }
+    
+    const params = {
+        Bucket: bucketName,
+        Key: `people-photos/${post.img}`
+    }
+
+    console.log(`Deleting ${params.Key}`)
+    
+    const command = new DeleteObjectCommand(params)
+    await s3.send(command)
+    
+    
+    await prisma.associates.delete({where: {id}})
+    
     res.send(post)
 })
 

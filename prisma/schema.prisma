@@ -7,10 +7,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+type AssociatesDocs {
+  link  String
+  title String
+}
+
+model Associates {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  bio       String
+  docs      AssociatesDocs[]
+  firstName String
+  img       String
+  lastName  String
+  role      String
+}
+
+model Contacts {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
 model Videos {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
-  fileName  String
-  eventName String
-  title     String
   desc      String
+  eventName String
+  fileName  String
+  title     String
 }
