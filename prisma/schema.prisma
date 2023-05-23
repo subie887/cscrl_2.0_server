@@ -8,8 +8,9 @@ datasource db {
 }
 
 type AssociatesDocs {
-  link  String
-  title String
+  link     String
+  title    String
+  fileName String
 }
 
 model Associates {

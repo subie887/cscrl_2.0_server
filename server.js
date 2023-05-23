@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
@@ -167,6 +167,46 @@ app.post("/api/associates", upload.single('img'), async (req, res) => {
     res.send({})
 })
 
+app.post("/api/associates/:id/docs", upload.single('pdf'), async (req, res) => {
+    const id = req.params.id
+
+    const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
+    const params = {
+        Bucket: bucketName,
+        Key: `research-pdf/${fileName}`,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+    }
+
+    const command = new PutObjectCommand(params)
+
+    await s3.send(command)
+
+    
+    const post = prisma.associates.update({
+        where: {id},
+        data: {
+            docs: {
+                push: {
+                    title: req.body.title,
+                    fileName: fileName,
+                    link: `${cloudfrontUrl}/${fileName}`,
+                }
+            },
+        }
+    })
+    .then((createdDoc) => {
+    console.log('Document created:', createdDoc);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+
+    res.send({})
+})
 
 app.delete("/api/videos/:id", async (req, res) => {
     const id = req.params.id
@@ -204,16 +244,38 @@ app.delete("/api/associates/:id", async (req, res) => {
         res.status(404).send("Not found")
         return
     }
+
+    let doclist = []
+
+    for (const doc of post.docs) {
+        doclist.push(
+            {
+                Key: `research-pdf/${doc.fileName}`
+            }
+        )
+    }
     
     const params = {
         Bucket: bucketName,
         Key: `people-photos/${post.img}`
     }
+    
+    const paramspdf = {
+        Bucket: bucketName,
+        Delete: {
+            Objects: doclist,
+        }
+    }
 
     console.log(`Deleting ${params.Key}`)
     
+    const commandpdf = new DeleteObjectsCommand(paramspdf)
+    await s3.send(commandpdf)
+    
     const command = new DeleteObjectCommand(params)
     await s3.send(command)
+    
+    
     
     
     await prisma.associates.delete({where: {id}})
