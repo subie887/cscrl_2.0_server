@@ -8,6 +8,7 @@ datasource db {
 }
 
 type AssociatesDocs {
+  fileName String
   link     String
   title    String
 }
@@ -20,6 +21,13 @@ model Associates {
   img       String
   lastName  String
   role      String
+}
+
+model Calendar {
+  id    String   @id @default(auto()) @map("_id") @db.ObjectId
+  date  DateTime @db.Date
+  desc  String
+  title String
 }
 
 model Contacts {

@@ -5,7 +5,7 @@ import cors from 'cors';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { ObjectId } from 'mongodb';
+import { ObjectId, Timestamp } from 'mongodb';
 
 dotenv.config()
 
@@ -16,6 +16,8 @@ const bucketRegion = process.env.BUCKET_REGION
 const accessKey = process.env.ACCESS_KEY
 const secretAccessKey = process.env.SECRET_ACCESS_KEY
 const cloudfrontUrl = process.env.CLOUDFRONT_URL
+const today = new Date()
+
 
 const s3 = new S3Client({
     credentials: {
@@ -93,6 +95,33 @@ app.get("/api/associates", async (req, res) => {
     res.send(associates)
 })
 
+app.get("/api/calendar", async (req, res) => {
+    const events = await prisma.calendar.findMany({
+        orderBy: [
+            { date: "asc" },
+        ]
+    })
+
+    const { pastEvents, futureEvents } = events.reduce(
+        (accumulator, event) => {
+          if (event.date < today) {
+            accumulator.pastEvents.push(event);
+          } else {
+            accumulator.futureEvents.push(event);
+          }
+          return accumulator;
+        },
+        { pastEvents: [], futureEvents: [] }
+    );
+    
+    const sortedFutureEvents = futureEvents.sort((a, b) => b.date - a.date);
+    const sortedPastEvents = pastEvents.sort((a, b) => a.date - b.date);
+    
+    const sortedEvents = sortedFutureEvents.concat(sortedPastEvents);
+
+    res.send(sortedEvents)
+})
+
 app.post("/api/videos", upload.single('file'), async (req, res) => {
 
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
@@ -116,8 +145,8 @@ app.post("/api/videos", upload.single('file'), async (req, res) => {
             desc: req.body.desc,
         }
     })
-    .then((createdVideo) => {
-    console.log('Video created:', createdVideo);
+    .then((created) => {
+    console.log('Video created:', created);
     // Handle the response or send a success message
     })
     .catch((error) => {
@@ -208,6 +237,27 @@ app.post("/api/associates/:id/docs", upload.single('pdf'), async (req, res) => {
     res.send({})
 })
 
+app.post("/api/calendar", upload.none(), async (req, res) => {
+    const post = prisma.calendar.create({
+        data: {
+            title: req.body.title,
+            desc: req.body.desc,
+            date: new Date(req.body.date),
+        }
+    })
+    .then((created) => {
+    console.log('Document created:', created);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+    console.log(post)
+    res.send({})
+})
+
 app.delete("/api/videos/:id", async (req, res) => {
     const id = req.params.id
     console.log(`Deleting ${id}`)
@@ -283,6 +333,23 @@ app.delete("/api/associates/:id", async (req, res) => {
     res.send(post)
 })
 
+app.delete("/api/calendar/:id", async (req, res) => {
+    const id = req.params.id
+    console.log(`Deleting ${id}`)
+    const post = await prisma.calendar.findUnique({where: {id}}) 
+    
+    if (!post) {
+        res.status(404).send("Not found")
+        return
+    }
+
+    await prisma.calendar.delete({
+        where: {id}
+    })
+
+    res.send(post)
+})
+
 app.listen(port, function () {
-  console.log('app listening on port ' + port + '!');
+  console.log(today +' app listening on port ' + port + '!');
 });
