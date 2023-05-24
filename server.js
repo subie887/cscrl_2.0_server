@@ -297,12 +297,28 @@ app.delete("/api/associates/:id", async (req, res) => {
 
     let doclist = []
 
-    for (const doc of post.docs) {
-        doclist.push(
-            {
-                Key: `research-pdf/${doc.fileName}`
+    if(!(post.docs === undefined || post.docs.length == 0)){
+
+        console.log("Triggered")
+        console.log(post.docs)
+        
+        for (const doc of post.docs) {
+            doclist.push(
+                {
+                    Key: `research-pdf/${doc.fileName}`
+                }
+            )
+        }
+
+        const paramspdf = {
+            Bucket: bucketName,
+            Delete: {
+                Objects: doclist,
             }
-        )
+        }
+
+        const commandpdf = new DeleteObjectsCommand(paramspdf)
+        await s3.send(commandpdf)
     }
     
     const params = {
@@ -310,24 +326,12 @@ app.delete("/api/associates/:id", async (req, res) => {
         Key: `people-photos/${post.img}`
     }
     
-    const paramspdf = {
-        Bucket: bucketName,
-        Delete: {
-            Objects: doclist,
-        }
-    }
 
     console.log(`Deleting ${params.Key}`)
     
-    const commandpdf = new DeleteObjectsCommand(paramspdf)
-    await s3.send(commandpdf)
     
     const command = new DeleteObjectCommand(params)
     await s3.send(command)
-    
-    
-    
-    
     await prisma.associates.delete({where: {id}})
     
     res.send(post)
