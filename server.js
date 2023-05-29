@@ -122,6 +122,12 @@ app.get("/api/calendar", async (req, res) => {
     res.send(sortedEvents)
 })
 
+app.get("/api/contacts", async (req, res) => {
+    const contacts = await prisma.contacts.findMany()
+
+    res.send(contacts)
+})
+
 app.post("/api/videos", upload.single('file'), async (req, res) => {
 
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`

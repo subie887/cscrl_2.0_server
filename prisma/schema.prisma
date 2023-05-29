@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+type ContactsContacts {
+  email String
+  phone String
+}
+
 type AssociatesDocs {
   fileName String
   link     String
@@ -31,7 +36,12 @@ model Calendar {
 }
 
 model Contacts {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id       String           @id @default(auto()) @map("_id") @db.ObjectId
+  contacts ContactsContacts
+  fName    String
+  lName    String
+  role     String
+  title    String
 }
 
 model Videos {
