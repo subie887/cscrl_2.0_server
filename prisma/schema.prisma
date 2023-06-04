@@ -45,9 +45,17 @@ model Contacts {
 }
 
 model Videos {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   desc      String
   eventName String
   fileName  String
   title     String
+  createdAt DateTime
+}
+
+model Lrmi {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  fileName String
+  year     Int
+  quarter  Int
 }

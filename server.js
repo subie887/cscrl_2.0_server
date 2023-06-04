@@ -5,7 +5,6 @@ import cors from 'cors';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { ObjectId, Timestamp } from 'mongodb';
 
 dotenv.config()
 
@@ -59,13 +58,16 @@ app.get("/api/videos/:confname", async (req, res) => {
     const videos = await prisma.videos.findMany({
         where: {
             eventName: req.params.confname
+        },
+        orderBy: {
+            createdAt: 'asc'
         }
     })
 
     for (const video of videos) {
         video.url = `${cloudfrontUrl}/${video.eventName}/${video.fileName}`
     }
-
+    
     res.send(videos)
 })
 
@@ -128,6 +130,35 @@ app.get("/api/contacts", async (req, res) => {
     res.send(contacts)
 })
 
+app.get("/api/lrmi", async (req, res) => {
+    const reports = await prisma.lrmi.groupBy({ by: ["year"] })
+    let uniqueReportYears = []
+
+    for (const report of reports) {
+        uniqueReportYears.push(report.year)
+    }
+
+    res.send(uniqueReportYears.sort((a, b) => a - b))
+})
+
+app.get("/api/lrmi/:year", async (req, res) => {
+    const reports = await prisma.lrmi.findMany({
+        where: {
+            year: parseInt(req.params.year),
+        },
+        orderBy: {
+            quarter: 'desc',
+        }
+    })
+
+    for (const report of reports) {
+        report.url = `${cloudfrontUrl}/lrmi-pdf/${report.fileName}`
+    }
+
+    res.send(reports)
+})
+
+
 app.post("/api/videos", upload.single('file'), async (req, res) => {
 
     const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
@@ -149,6 +180,7 @@ app.post("/api/videos", upload.single('file'), async (req, res) => {
             eventName: req.body.eventName,
             title: req.body.title,
             desc: req.body.desc,
+            createdAt: today,
         }
     })
     .then((created) => {
@@ -264,6 +296,41 @@ app.post("/api/calendar", upload.none(), async (req, res) => {
     res.send({})
 })
 
+app.post("/api/lrmi", upload.single('pdf'), async (req, res) => {
+    const id = req.params.id
+
+    const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
+    const params = {
+        Bucket: bucketName,
+        Key: `lrmi-pdf/${fileName}`,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+    }
+
+    const command = new PutObjectCommand(params)
+
+    await s3.send(command)
+
+    const post = prisma.lrmi.create({
+        data: {
+            fileName: fileName,
+            year: parseInt(req.body.year),
+            quarter: parseInt(req.body.quarter),
+        }
+    })
+    .then((createdDoc) => {
+    console.log('Document created:', createdDoc);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+
+    res.send({})
+})
+
 app.delete("/api/videos/:id", async (req, res) => {
     const id = req.params.id
     console.log(`Deleting ${id}`)
@@ -354,6 +421,33 @@ app.delete("/api/calendar/:id", async (req, res) => {
     }
 
     await prisma.calendar.delete({
+        where: {id}
+    })
+
+    res.send(post)
+})
+
+app.delete("/api/lrmi/:id", async (req, res) => {
+    const id = req.params.id
+    console.log(`Deleting ${id}`)
+    const post = await prisma.lrmi.findUnique({where: {id}}) 
+    
+    if (!post) {
+        res.status(404).send("Not found")
+        return
+    }
+
+    const params = {
+        Bucket: bucketName,
+        Key: `lrmi-pdf/${post.fileName}`
+    }
+
+    console.log(`Deleting ${params.Key}`)
+
+    const command = new DeleteObjectCommand(params)
+    await s3.send(command)
+
+    await prisma.lrmi.delete({
         where: {id}
     })
 
