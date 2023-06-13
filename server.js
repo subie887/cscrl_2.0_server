@@ -2,29 +2,40 @@ import express from 'express';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { AdminGetUserCommand, AdminInitiateAuthCommand, CognitoIdentityProviderClient, InitiateAuthCommand, RespondToAuthChallengeCommand, SignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 dotenv.config()
 
 const randomFileName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex')
 
 const bucketName = process.env.BUCKET_NAME
-const bucketRegion = process.env.BUCKET_REGION
+const region = process.env.BUCKET_REGION
 const accessKey = process.env.ACCESS_KEY
 const secretAccessKey = process.env.SECRET_ACCESS_KEY
 const cloudfrontUrl = process.env.CLOUDFRONT_URL
-const today = new Date()
 
+const cognitoClientId = process.env.COGNITO_CLIENT_ID
+const cognitoUserPoolId = process.env.COGNITO_USERPOOL_ID
 
 const s3 = new S3Client({
     credentials: {
         accessKeyId: accessKey,
         secretAccessKey: secretAccessKey,
     },
-    region: bucketRegion
+    region: region
 });
+
+const cognito = new CognitoIdentityProviderClient({
+    credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretAccessKey,
+    },
+    region: region 
+})
 
 const app = express()
 app.use(
@@ -72,7 +83,16 @@ app.get("/api/videos/:confname", async (req, res) => {
 })
 
 app.get("/api/events", async (req, res) => {
-    const videos = await prisma.videos.groupBy({ by: ["eventName"] })
+    const videos = await prisma.videos.findMany({ 
+        distinct: ['eventName'],
+        select: {
+            eventName: true,
+            createdAt: true,
+        },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    })
     let uniqueEventNames = []
 
     for (const video of videos) {
@@ -106,7 +126,7 @@ app.get("/api/calendar", async (req, res) => {
 
     const { pastEvents, futureEvents } = events.reduce(
         (accumulator, event) => {
-          if (event.date < today) {
+          if (event.date < new Date()) {
             accumulator.pastEvents.push(event);
           } else {
             accumulator.futureEvents.push(event);
@@ -138,7 +158,7 @@ app.get("/api/lrmi", async (req, res) => {
         uniqueReportYears.push(report.year)
     }
 
-    res.send(uniqueReportYears.sort((a, b) => a - b))
+    res.send(uniqueReportYears.sort((a, b) => b - a))
 })
 
 app.get("/api/lrmi/:year", async (req, res) => {
@@ -147,7 +167,7 @@ app.get("/api/lrmi/:year", async (req, res) => {
             year: parseInt(req.params.year),
         },
         orderBy: {
-            quarter: 'desc',
+            quarter: 'asc',
         }
     })
 
@@ -180,7 +200,7 @@ app.post("/api/videos", upload.single('file'), async (req, res) => {
             eventName: req.body.eventName,
             title: req.body.title,
             desc: req.body.desc,
-            createdAt: today,
+            createdAt: new Date(),
         }
     })
     .then((created) => {
@@ -331,6 +351,70 @@ app.post("/api/lrmi", upload.single('pdf'), async (req, res) => {
     res.send({})
 })
 
+
+app.post("/auth/signin", upload.single('none'), async (req, res) => {
+    
+    const getUserParams = {
+        UserPoolId: cognitoUserPoolId,
+        Username: req.body.email,
+    }
+    
+    const getUserCommand = new AdminGetUserCommand(getUserParams)
+    
+    //Get user status
+    const userInfo = await cognito.send(getUserCommand)
+    const isFirstLogin = userInfo.UserStatus === 'FORCE_CHANGE_PASSWORD' || userInfo.UserStatus === 'RESET_REQUIRED'
+    const authFlow = isFirstLogin ? 'ADMIN_USER_PASSWORD_AUTH' : 'USER_PASSWORD_AUTH'
+    //Auth params
+    
+    const params = {
+        AuthFlow: authFlow,
+        ClientId: cognitoClientId,
+        UserPoolId: cognitoUserPoolId,
+        AuthParameters: {
+            USERNAME: req.body.email,
+            PASSWORD: req.body.password,
+        },
+    }
+    
+    try {
+        if(isFirstLogin){
+            const result = await cognito.send(command)
+            res.send(result)
+        } else {
+            const command = new InitiateAuthCommand(params)
+            const result = await cognito.send(command)
+            result.AuthenticationResult.decoded = jwt.decode(result.AuthenticationResult.IdToken)
+            res.send(result)
+        }
+    } catch (error) {
+        res.send({}).status(400)
+    }
+    
+})
+
+app.post("/auth/register", upload.single('none'), async (req, res) => {
+    const params = {
+        ClientId: cognitoClientId,
+        ChallengeName: "NEW_PASSWORD_REQUIRED",
+        Session: req.body.session,
+        ChallengeResponses: {
+            NEW_PASSWORD: req.body.newPassword,
+            USERNAME: req.body.username,
+            "userAttributes.given_name": req.body.firstName,
+            "userAttributes.family_name": req.body.lastName
+        }
+    }
+
+    const command = new RespondToAuthChallengeCommand(params)
+    const result = await cognito.send(command)
+    try {
+        res.send(result)
+    } catch (error) {
+        res.send(error)
+    }
+})
+
 app.delete("/api/videos/:id", async (req, res) => {
     const id = req.params.id
     console.log(`Deleting ${id}`)
@@ -455,5 +539,5 @@ app.delete("/api/lrmi/:id", async (req, res) => {
 })
 
 app.listen(port, function () {
-  console.log(today +' app listening on port ' + port + '!');
+  console.log(new Date() +' app listening on port ' + port + '!');
 });
