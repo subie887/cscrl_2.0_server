@@ -379,6 +379,7 @@ app.post("/auth/signin", upload.single('none'), async (req, res) => {
     
     try {
         if(isFirstLogin){
+            const command = new AdminInitiateAuthCommand(params)
             const result = await cognito.send(command)
             res.send(result)
         } else {
