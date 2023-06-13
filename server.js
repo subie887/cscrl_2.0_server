@@ -277,7 +277,7 @@ app.post("/api/associates/:id/docs", upload.single('pdf'), async (req, res) => {
                 push: {
                     title: req.body.title,
                     fileName: fileName,
-                    link: `${cloudfrontUrl}/${fileName}`,
+                    link: `${cloudfrontUrl}/research-pdf/${fileName}`,
                 }
             },
         }
