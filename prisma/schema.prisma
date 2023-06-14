@@ -59,3 +59,11 @@ model Lrmi {
   year     Int
   quarter  Int
 }
+
+model Newsletter {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  fileName String
+  year     Int
+  title    String
+  month    Int
+}

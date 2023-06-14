@@ -161,6 +161,17 @@ app.get("/api/lrmi", async (req, res) => {
     res.send(uniqueReportYears.sort((a, b) => b - a))
 })
 
+app.get("/api/newsletter", async (req, res) => {
+    const letters = await prisma.newsletter.groupBy({ by: ["year"] })
+    let uniqueLetterYears = []
+
+    for (const letter of letters) {
+        uniqueLetterYears.push(letter.year)
+    }
+
+    res.send(uniqueLetterYears.sort((a, b) => b - a))
+})
+
 app.get("/api/lrmi/:year", async (req, res) => {
     const reports = await prisma.lrmi.findMany({
         where: {
@@ -176,6 +187,23 @@ app.get("/api/lrmi/:year", async (req, res) => {
     }
 
     res.send(reports)
+})
+
+app.get("/api/newsletter/:year", async (req, res) => {
+    const letters = await prisma.newsletter.findMany({
+        where: {
+            year: parseInt(req.params.year),
+        },
+        orderBy: {
+            month: 'desc',
+        }
+    })
+
+    for (const letter of letters) {
+        letter.url = `${cloudfrontUrl}/newsletter-pdf/${letter.fileName}`
+    }
+
+    res.send(letters)
 })
 
 
@@ -336,6 +364,42 @@ app.post("/api/lrmi", upload.single('pdf'), async (req, res) => {
             fileName: fileName,
             year: parseInt(req.body.year),
             quarter: parseInt(req.body.quarter),
+        }
+    })
+    .then((createdDoc) => {
+    console.log('Document created:', createdDoc);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+
+    res.send({})
+})
+
+app.post("/api/newsletter", upload.single('pdf'), async (req, res) => {
+    const id = req.params.id
+
+    const fileName = `${randomFileName()}.${req.file.originalname.split('.').pop()}`
+    const params = {
+        Bucket: bucketName,
+        Key: `newsletter-pdf/${fileName}`,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+    }
+
+    const command = new PutObjectCommand(params)
+
+    await s3.send(command)
+
+    const post = prisma.newsletter.create({
+        data: {
+            fileName: fileName,
+            year: parseInt(req.body.year),
+            month: parseInt(req.body.month),
+            title: `${req.body.title} (PDF)`,
         }
     })
     .then((createdDoc) => {
@@ -533,6 +597,33 @@ app.delete("/api/lrmi/:id", async (req, res) => {
     await s3.send(command)
 
     await prisma.lrmi.delete({
+        where: {id}
+    })
+
+    res.send(post)
+})
+
+app.delete("/api/newsletter/:id", async (req, res) => {
+    const id = req.params.id
+    console.log(`Deleting ${id}`)
+    const post = await prisma.newsletter.findUnique({where: {id}}) 
+    
+    if (!post) {
+        res.status(404).send("Not found")
+        return
+    }
+
+    const params = {
+        Bucket: bucketName,
+        Key: `newsletter-pdf/${post.fileName}`
+    }
+
+    console.log(`Deleting ${params.Key}`)
+
+    const command = new DeleteObjectCommand(params)
+    await s3.send(command)
+
+    await prisma.newsletter.delete({
         where: {id}
     })
 
