@@ -120,28 +120,11 @@ app.get("/api/associates", async (req, res) => {
 app.get("/api/calendar", async (req, res) => {
     const events = await prisma.calendar.findMany({
         orderBy: [
-            { date: "asc" },
+            { date: "ascs" },
         ]
     })
 
-    const { pastEvents, futureEvents } = events.reduce(
-        (accumulator, event) => {
-          if (event.date < new Date()) {
-            accumulator.pastEvents.push(event);
-          } else {
-            accumulator.futureEvents.push(event);
-          }
-          return accumulator;
-        },
-        { pastEvents: [], futureEvents: [] }
-    );
-    
-    const sortedFutureEvents = futureEvents.sort((a, b) => b.date - a.date);
-    const sortedPastEvents = pastEvents.sort((a, b) => a.date - b.date);
-    
-    const sortedEvents = sortedFutureEvents.concat(sortedPastEvents);
-
-    res.send(sortedEvents)
+    res.send(events)
 })
 
 app.get("/api/contacts", async (req, res) => {
