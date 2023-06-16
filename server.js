@@ -64,6 +64,9 @@ const upload = multer({ storage: storage })
 var port = process.env.PORT || 3000;
 
 
+app.head("/", async (req, res) => {
+    res.send({})
+})
 
 app.get("/api/videos/:confname", async (req, res) => {
     const videos = await prisma.videos.findMany({
