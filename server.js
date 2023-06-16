@@ -120,7 +120,7 @@ app.get("/api/associates", async (req, res) => {
 app.get("/api/calendar", async (req, res) => {
     const events = await prisma.calendar.findMany({
         orderBy: [
-            { date: "ascs" },
+            { date: "asc" },
         ]
     })
 
@@ -408,35 +408,36 @@ app.post("/auth/signin", upload.single('none'), async (req, res) => {
     
     const getUserCommand = new AdminGetUserCommand(getUserParams)
     
-    //Get user status
-    const userInfo = await cognito.send(getUserCommand)
-    const isFirstLogin = userInfo.UserStatus === 'FORCE_CHANGE_PASSWORD' || userInfo.UserStatus === 'RESET_REQUIRED'
-    const authFlow = isFirstLogin ? 'ADMIN_USER_PASSWORD_AUTH' : 'USER_PASSWORD_AUTH'
-    //Auth params
-    
-    const params = {
-        AuthFlow: authFlow,
-        ClientId: cognitoClientId,
-        UserPoolId: cognitoUserPoolId,
-        AuthParameters: {
-            USERNAME: req.body.email,
-            PASSWORD: req.body.password,
-        },
-    }
-    
     try {
+        //Get user status
+        const userInfo = await cognito.send(getUserCommand)
+        const isFirstLogin = userInfo.UserStatus === 'FORCE_CHANGE_PASSWORD' || userInfo.UserStatus === 'RESET_REQUIRED'
+        const authFlow = isFirstLogin ? 'ADMIN_USER_PASSWORD_AUTH' : 'USER_PASSWORD_AUTH'
+        //Auth params
+        const params = {
+            AuthFlow: authFlow,
+            ClientId: cognitoClientId,
+            UserPoolId: cognitoUserPoolId,
+            AuthParameters: {
+                USERNAME: req.body.email,
+                PASSWORD: req.body.password,
+            },
+        }
+        
         if(isFirstLogin){
             const command = new AdminInitiateAuthCommand(params)
             const result = await cognito.send(command)
-            res.send(result)
+
+            res.send(result).status(200)
         } else {
             const command = new InitiateAuthCommand(params)
             const result = await cognito.send(command)
             result.AuthenticationResult.decoded = jwt.decode(result.AuthenticationResult.IdToken)
-            res.send(result)
+ 
+            res.send(result).status(200)
         }
     } catch (error) {
-        res.send({}).status(400)
+        res.send(error).status(400)
     }
     
 })
