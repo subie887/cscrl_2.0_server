@@ -147,6 +147,23 @@ app.get("/api/lrmi", async (req, res) => {
     res.send(uniqueReportYears.sort((a, b) => b - a))
 })
 
+app.get("/api/lrmi/:year", async (req, res) => {
+    const reports = await prisma.lrmi.findMany({
+        where: {
+            year: parseInt(req.params.year),
+        },
+        orderBy: {
+            quarter: 'desc',
+        }
+    })
+
+    for (const report of reports) {
+        report.url = `${cloudfrontUrl}/lrmi-pdf/${report.fileName}`
+    }
+
+    res.send(reports)
+})
+
 app.get("/api/newsletter", async (req, res) => {
     const letters = await prisma.newsletter.groupBy({ by: ["year"] })
     let uniqueLetterYears = []
@@ -158,22 +175,6 @@ app.get("/api/newsletter", async (req, res) => {
     res.send(uniqueLetterYears.sort((a, b) => b - a))
 })
 
-app.get("/api/lrmi/:year", async (req, res) => {
-    const reports = await prisma.lrmi.findMany({
-        where: {
-            year: parseInt(req.params.year),
-        },
-        orderBy: {
-            quarter: 'asc',
-        }
-    })
-
-    for (const report of reports) {
-        report.url = `${cloudfrontUrl}/lrmi-pdf/${report.fileName}`
-    }
-
-    res.send(reports)
-})
 
 app.get("/api/newsletter/:year", async (req, res) => {
     const letters = await prisma.newsletter.findMany({
@@ -190,6 +191,30 @@ app.get("/api/newsletter/:year", async (req, res) => {
     }
 
     res.send(letters)
+})
+
+app.get("/api/podcasts", async (req, res) => {
+    const podcasts = await prisma.podcasts.groupBy({ by: ["year"] })
+    let uniquePodcastsYears = []
+
+    for (const podcast of podcasts) {
+        uniquePodcastsYears.push(podcast.year)
+    }
+    res.send(uniquePodcastsYears.sort((a, b) => b - a))
+})
+
+
+app.get("/api/podcasts/:year", async (req, res) => {
+    const podcasts = await prisma.podcasts.findMany({
+        where: {
+            year: parseInt(req.params.year),
+        },
+        orderBy: {
+            date: 'desc',
+        }
+    })
+
+    res.send(podcasts)
 })
 
 
@@ -386,6 +411,31 @@ app.post("/api/newsletter", upload.single('pdf'), async (req, res) => {
             year: parseInt(req.body.year),
             month: parseInt(req.body.month),
             title: `${req.body.title} (PDF)`,
+        }
+    })
+    .then((createdDoc) => {
+    console.log('Document created:', createdDoc);
+    // Handle the response or send a success message
+    })
+    .catch((error) => {
+    console.error('Error creating video:', error);
+    // Handle the error or send an error response
+    });
+    
+
+    res.send({})
+})
+
+app.post("/api/podcasts", upload.single('none'), async (req, res) => {
+    const id = req.params.id
+
+    const post = prisma.podcasts.create({
+        data: {
+            title: req.body.title,
+            description: req.body.description,
+            source: req.body.source,
+            date: new Date(req.body.date),
+            year: new Date(req.body.date).getFullYear(),
         }
     })
     .then((createdDoc) => {

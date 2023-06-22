@@ -67,3 +67,12 @@ model Newsletter {
   title    String
   month    Int
 }
+
+model Podcasts {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  date        DateTime @db.Date
+  year        Int
+  source      String
+}
