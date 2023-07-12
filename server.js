@@ -108,8 +108,7 @@ app.get("/api/events", async (req, res) => {
 app.get("/api/associates", async (req, res) => {
     const associates = await prisma.associates.findMany({
         orderBy: [
-            { firstName: "desc" },
-            { lastName: 'desc' },
+            { priority: "asc" },
         ]
     })
 

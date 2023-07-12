@@ -26,6 +26,7 @@ model Associates {
   img       String
   lastName  String
   role      String
+  priority  Int
 }
 
 model Calendar {
