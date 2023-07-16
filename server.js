@@ -3,7 +3,7 @@ import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { AdminGetUserCommand, AdminInitiateAuthCommand, CognitoIdentityProviderClient, InitiateAuthCommand, RespondToAuthChallengeCommand, SignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { AdminAddUserToGroupCommand, AdminGetUserCommand, AdminInitiateAuthCommand, CognitoIdentityProviderClient, InitiateAuthCommand, RespondToAuthChallengeCommand, SignUpCommand } from '@aws-sdk/client-cognito-identity-provider';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -509,7 +509,15 @@ app.post("/auth/register", upload.single('none'), async (req, res) => {
 
     const command = new RespondToAuthChallengeCommand(params)
     const result = await cognito.send(command)
+
+    
     try {
+        const group = {
+            UserPoolId: cognitoUserPoolId,
+            Username: req.body.username,
+            GroupName: "user",
+        }
+        await cognito.send(new AdminAddUserToGroupCommand(group))
         res.send(result)
     } catch (error) {
         res.send(error)
