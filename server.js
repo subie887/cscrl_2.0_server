@@ -277,6 +277,7 @@ app.post("/api/associates", upload.single('img'), async (req, res) => {
             lastName: req.body.lastName,
             role: req.body.role,
             bio: req.body.bio,
+            priority: 255
         }
     })
     .then((createdPerson) => {
