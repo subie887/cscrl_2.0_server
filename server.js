@@ -40,8 +40,7 @@ const cognito = new CognitoIdentityProviderClient({
 const app = express()
 app.use(
     cors({
-        origin: ["http://localhost:5173", "https://cscrl.com", "https://cscrl.onrender.com"],
-        
+        origin: ["http://localhost:5173", "https://cscrl.com", "https://cscrl.onrender.com", "https://cscrl-api.onrender.com"],
     })
 );
 
