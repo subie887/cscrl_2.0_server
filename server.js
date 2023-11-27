@@ -38,19 +38,22 @@ const cognito = new CognitoIdentityProviderClient({
 })
 
 const app = express()
+
+// Apply CORS middleware
 app.use(
     cors({
         origin: ["http://localhost:5173", "https://cscrl.com", "https://cscrl.onrender.com", "https://cscrl-api.onrender.com"],
     })
 );
 
+// Options pre-flight request
 app.options('*', cors());
 
-
-app.use(function (req, res, next) {
+// Additional CORS headers
+app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT,DELETE");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, PUT, POST");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });
 
